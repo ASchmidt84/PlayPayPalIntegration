@@ -15,11 +15,11 @@ case class PayPalNVP(private val paypalUser: String,
   private val url = if(testMode) "https://api-3t.sandbox.paypal.com/nvp" else "https://api-3t.paypal.com/nvp"
 
   private val paramList = (method: String) => List(
-    "METHOD" -> method,
-    "VERSION" -> paypalVersion,
-    "USER" -> paypalUser,
-    "PWD" -> paypalPass,
-    "SIGNATURE" -> paypalSignature
+    "METHOD"    -> method,
+    "VERSION"   -> paypalVersion,
+    "USER"      -> (if(testMode) "sdk-three_api1.sdk.com" else paypalUser),
+    "PWD"       -> (if(testMode) "QFZCWN5HZM8VBG7Q" else paypalPass),
+    "SIGNATURE" -> (if(testMode) "A-IzJhZZjhg29XQ2qnhapuwxIDzyAZQ92FRP5dqBzVesOkzbdUONzmOU" else paypalSignature)
   )
 
   /**
@@ -38,10 +38,13 @@ case class PayPalNVP(private val paypalUser: String,
       Http(url).params( paramList("SetExpressCheckout") ::: parameter.toList ).method("GET").timeout(60000,60000).asParams.body
     ) match {
       case Success(seq) if seq.exists(_._1.toLowerCase == "token") =>
-        val token = seq.find(_._1.toLowerCase == "token").get
+        val token = seq.find(_._1.toLowerCase == "token").get._2
         seq.find(_._1.toLowerCase == "ack") match {
           case Some((_,state)) if state.toLowerCase == "success" =>
-            s"https://paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=$token"
+            if(testMode)
+              s"https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=$token"
+            else
+              s"https://paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=$token"
           case _ => throw new PayPalAckException()
         }
       case Failure(err) => throw new PayPalException("Error in paypal request",err)
